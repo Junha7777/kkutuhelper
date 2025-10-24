@@ -1,5 +1,6 @@
 # kkutuhelper
 [끄투코리아](kkutu.co.kr)에서만 사용 가능
+[Korean Notion Docs](https://www.notion.so/Project-Report-KKUTU-HELPER-2216a3ed2d7980dbbdd2fbc6264c9e7f?source=copy_link)
 
 # 사용법
 ## Chrome
