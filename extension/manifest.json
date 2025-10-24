@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "KKUTU Word Reporter",
+  "version": "1.0",
+  "description": "Send current word from kkutu to local overlay via WebSocket",
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": ["https://kkutu.co.kr/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://kkutu.co.kr/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
