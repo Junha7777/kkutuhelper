@@ -1,182 +1,179 @@
-# overlay.py
-# Dependencies: PySide6, keyboard
-# pip install PySide6 keyboard
-
 import sys
 import os
+import json
+import asyncio
 import threading
-import ctypes
-from ctypes import wintypes
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QLabel, QPushButton, QCheckBox
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
-import random
-import time
-import keyboard  # for global hotkeys
-import pyperclip  # optional: pip install pyperclip
+import websockets
+from PyQt5 import QtCore, QtWidgets
 
-# ---------- Config ----------
-WORDS_FILE = "words.txt"
-USED_LOG = "used_words.txt"
-HOTKEY_CAPTURE = "ctrl+shift+c"   # 클립보드 단어를 현재 단어로 설정
-HOTKEY_TOGGLE = "ctrl+shift+s"    # overlay 토글
-# ----------------------------
 
-# Win32 constants
-GWL_EXSTYLE = -20
-WS_EX_LAYERED = 0x00080000
-WS_EX_TRANSPARENT = 0x00000020
-WS_EX_TOPMOST = 0x00000008
-WS_EX_TOOLWINDOW = 0x00000080
-LWA_ALPHA = 0x02
+# -----------------------------
+# WebSocket 서버 (호환 수정)
+# -----------------------------
+async def ws_handler(websocket, path=None):
+    async for message in websocket:
+        print(f"[WS] Word received: {message}")
+        try:
+            data = json.loads(message)
+            word = data.get("word", "")
+            if isinstance(word, list):
+                word = "".join(map(str, word))
+            elif not isinstance(word, str):
+                word = str(word)
 
-SetWindowLongPtr = ctypes.windll.user32.SetWindowLongPtrW
-GetWindowLongPtr = ctypes.windll.user32.GetWindowLongPtrW
-SetLayeredWindowAttributes = ctypes.windll.user32.SetLayeredWindowAttributes
+            print(f"[WS] Parsed word: {word}")
 
-def set_overlay_exstyle(hwnd):
-    ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE)
-    # 추가: TOOLWINDOW(작업표시줄 숨김), TRANSPARENT(클릭통과 toggle 가능), LAYERED(알파)
-    ex |= (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW)
-    SetWindowLongPtr(hwnd, GWL_EXSTYLE, ex)
-    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)
+            QtCore.QMetaObject.invokeMethod(
+                Overlay.instance(),
+                "on_word_received_safe",
+                QtCore.Qt.QueuedConnection,
+                QtCore.Q_ARG(str, word)
+            )
+        except Exception as e:
+            print("[WS] Error parsing message:", e)
 
-def set_clickthrough(hwnd, enable=True):
-    ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE)
-    if enable:
-        ex |= WS_EX_TRANSPARENT
-    else:
-        ex &= ~WS_EX_TRANSPARENT
-    SetWindowLongPtr(hwnd, GWL_EXSTYLE, ex)
 
-# ---------- Word helper ----------
-def load_words():
-    if not os.path.exists(WORDS_FILE):
-        # create sample file
-        with open(WORDS_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(["사랑","강아지","지하철","철수","수박","박쥐","쥐덫","지구","가방","바다","다리"]))
-    with open(WORDS_FILE, "r", encoding="utf-8") as f:
-        words = [w.strip() for w in f if w.strip()]
-    return words
+async def start_ws_server():
+    async with websockets.serve(
+        lambda ws, p=None: ws_handler(ws, p),
+        "127.0.0.1",
+        8765,
+    ):
+        print("[WS] WebSocket server started on ws://127.0.0.1:8765")
+        await asyncio.Future()
 
-def append_used(word):
-    with open(USED_LOG, "a", encoding="utf-8") as f:
-        f.write(word + "\n")
 
-def next_candidates(current, words):
-    if not current:
-        return []
-    last_char = current[-1]
-    # 간단 구현: 단어의 첫 글자와 last_char가 같으면 후보
-    # (한글 받침·초성 규칙을 완벽 지원하려면 별도 로직 필요)
-    cands = [w for w in words if w[0] == last_char]
-    return cands
+def run_ws_server():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(start_ws_server())
+    loop.run_forever()
 
-# ---------- UI ----------
-class Overlay(QWidget):
+
+# -----------------------------
+# Overlay 클래스
+# -----------------------------
+class Overlay(QtWidgets.QWidget):
+    _instance = None
+
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setWindowTitle("끝말잇기 도우미 (Overlay)")
-        self.setGeometry(100, 100, 420, 120)
+        Overlay._instance = self
 
-        font = QFont("맑은 고딕", 12)
-        layout = QVBoxLayout()
-        layout.setContentsMargins(8,8,8,8)
+        self.words = self.load_words("words.txt")
+        self.deadlocked_file = "kkutudeadlocked.txt"
+        self.offset = None
+        self.initUI()
 
-        self.input = QLineEdit()
-        self.input.setPlaceholderText("현재 단어를 입력하거나 Ctrl+Shift+C로 클립보드 내용 가져오기")
-        self.input.setFont(font)
-        layout.addWidget(self.input)
+        self.server_thread = threading.Thread(target=run_ws_server, daemon=True)
+        self.server_thread.start()
 
-        self.result = QLabel("추천 단어: -")
-        self.result.setFont(font)
-        self.result.setStyleSheet("background: rgba(0,0,0,0.5); color: white; padding:6px; border-radius:6px;")
-        layout.addWidget(self.result)
+    @staticmethod
+    def instance():
+        return Overlay._instance
 
-        controls = QVBoxLayout()
-        self.btn_save = QPushButton("사용 단어 저장")
-        self.btn_save.clicked.connect(self.save_used)
-        self.cb_clickthrough = QCheckBox("클릭 통과 (Click-through)")
-        self.cb_clickthrough.setChecked(True)
-        self.cb_clickthrough.stateChanged.connect(self.update_clickthrough)
-        controls_widget = QWidget()
-        ctr_layout = QVBoxLayout()
-        ctr_layout.addWidget(self.btn_save)
-        ctr_layout.addWidget(self.cb_clickthrough)
-        controls_widget.setLayout(ctr_layout)
-        layout.addWidget(controls_widget)
+    def load_words(self, filename):
+        if not os.path.exists(filename):
+            print("[WARN] words.txt not found")
+            return []
+        with open(filename, "r", encoding="utf-8") as f:
+            raw = f.read()
+        cleaned = raw.replace(",", "\n").replace("'", "").replace('"', "")
+        return [line.strip() for line in cleaned.splitlines() if line.strip()]
+
+    def initUI(self):
+        self.setWindowFlags(
+            QtCore.Qt.FramelessWindowHint |
+            QtCore.Qt.WindowStaysOnTopHint |
+            QtCore.Qt.Tool
+        )
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+
+        layout = QtWidgets.QVBoxLayout(self)
+
+        self.label = QtWidgets.QLabel("Waiting for word...", self)
+        self.label.setWordWrap(True)
+        self.label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(40, 40, 40, 200);
+                color: white;
+                font-size: 15px;
+                border-radius: 10px;
+                padding: 8px;
+            }
+        """)
+        layout.addWidget(self.label)
+
+        self.close_button = QtWidgets.QPushButton("X", self)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: red;
+                color: white;
+                border: none;
+                font-weight: bold;
+                border-radius: 8px;
+                width: 25px;
+                height: 25px;
+            }
+            QPushButton:hover {
+                background-color: darkred;
+            }
+        """)
+        self.close_button.setFixedSize(25, 25)
+        self.close_button.clicked.connect(QtWidgets.qApp.quit)
+        layout.addWidget(self.close_button, alignment=QtCore.Qt.AlignRight)
 
         self.setLayout(layout)
+        self.setGeometry(100, 100, 420, 150)
+        self.show()
 
-        self.words = load_words()
-        self.input.textChanged.connect(self.on_text_change)
-        self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self.refresh_words_from_file)
-        self.refresh_timer.start(5000)  # 5초마다 words.txt 재로딩
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.offset = event.pos()
 
-        # Make window styles native after shown
-        QTimer.singleShot(100, self.apply_native_styles)
+    def mouseMoveEvent(self, event):
+        if self.offset is not None and event.buttons() == QtCore.Qt.LeftButton:
+            self.move(self.pos() + event.pos() - self.offset)
 
-    def apply_native_styles(self):
-        hwnd = self.winId().__int__()
-        set_overlay_exstyle(hwnd)
-        set_clickthrough(hwnd, self.cb_clickthrough.isChecked())
+    def mouseReleaseEvent(self, event):
+        self.offset = None
 
-    def update_clickthrough(self):
-        hwnd = self.winId().__int__()
-        set_clickthrough(hwnd, self.cb_clickthrough.isChecked())
+    @QtCore.pyqtSlot(str)
+    def on_word_received_safe(self, word):
+        self.on_word_received(word)
 
-    def on_text_change(self, text):
-        cands = next_candidates(text.strip(), self.words)
-        if not cands:
-            self.result.setText("추천 단어: 없음")
-        else:
-            # 상위 5개 무작위 제시
-            sample = cands if len(cands) <= 5 else random.sample(cands, 5)
-            self.result.setText("추천 단어: " + ", ".join(sample))
+    def on_word_received(self, word):
+        suggestions = self.suggest(word)
+        if not suggestions:
+            with open(self.deadlocked_file, "a", encoding="utf-8") as f:
+                f.write(word + "\n")
+        display_text = (
+            f"현재 단어: {word}\n추천:\n" + "\n".join(suggestions)
+            if suggestions else f"현재 단어: {word}\n추천: -"
+        )
+        self.label.setText(display_text)
+        self.label.adjustSize()
+        self.adjustSize()
 
-    def save_used(self):
-        w = self.input.text().strip()
-        if w:
-            append_used(w)
+    def suggest(self, word):
+        if not word:
+            return []
+        base = word
+        alts = []
+        if "(" in word and ")" in word:
+            start = word.find("(")
+            end = word.find(")")
+            alt = word[start + 1:end]
+            base = word[:start]
+            alts = [alt]
+        candidates = [w for w in self.words if w.startswith(base)]
+        for alt in alts:
+            candidates += [w for w in self.words if w.startswith(alt)]
+        unique = sorted(set(candidates), key=len, reverse=True)
+        return unique[:20]
 
-    def refresh_words_from_file(self):
-        self.words = load_words()
-
-# ---------- Hotkey handling ----------
-def start_hotkeys(window: Overlay):
-    def on_capture():
-        try:
-            txt = pyperclip.paste()
-        except Exception:
-            txt = ""
-        txt = txt.strip()
-        if txt:
-            # set in GUI thread
-            window.input.setText(txt)
-    def on_toggle():
-        if window.isVisible():
-            window.hide()
-        else:
-            window.show()
-            # reapply styles (sometimes need)
-            window.apply_native_styles()
-    keyboard.add_hotkey(HOTKEY_CAPTURE, on_capture)
-    keyboard.add_hotkey(HOTKEY_TOGGLE, on_toggle)
-
-# ---------- main ----------
-def main():
-    app = QApplication(sys.argv)
-    w = Overlay()
-    w.show()
-
-    # start hotkey thread so it doesn't block Qt
-    t = threading.Thread(target=start_hotkeys, args=(w,), daemon=True)
-    t.start()
-
-    sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    app = QtWidgets.QApplication(sys.argv)
+    overlay = Overlay()
+    sys.exit(app.exec_())
