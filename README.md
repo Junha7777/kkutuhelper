@@ -22,4 +22,4 @@ kkutuhelper/KKUTU 폴더를 터미널에서 실행 후
 
 # 단어장
 kkutuhelper/KKUTU/words.txt에 기본적으로 장문이 저장되어있으며, 아래에 줄바꿈 기준으로 추가하실 수 있습니다.
-~~kkutuhelper/KKUTU/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장됩니다.~~ 현재 작동 안 함.
+~~kkutuhelper/KKUTU/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장됩니다.~~ 개선 예정
