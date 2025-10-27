@@ -14,7 +14,7 @@ kkutuhelper/overlay 폴더를 터미널에서 연 후
 ## Firefox
 [Firefox Developer Edition](https://www.firefox.com/ko/channel/desktop/developer/) 다운로드
 Firefox Developer Edition에서 [about:config](about:config) 접속 -> network.websocket.allowInsecureFromHTTPS를 True로 바꾸기
-[about:addons](about:addons)에서 설정 버튼 클릭 -> 파일에서 부가 기능 설치 -> kkutuhelper/firefox/firefox.zip 열기
+[about:debugging#/runtime/this-firefox](about:debugging#/runtime/this-firefox)에서 '임시 부가 기능 로드...' 클릭 -> kkutuhelper/firefox/firefox.zip 열기
 kkutuhelper/overlay 폴더를 터미널에서 연 후
 
 ```python overlay.py```
