@@ -229,7 +229,7 @@ class Overlay(QtWidgets.QWidget):
             candidates += [w for w in prefix_list if w.startswith(b)]
 
         unique = sorted(set(candidates), key=len, reverse=True)
-        return unique[:20]
+        return unique[:10]
 
 
 # -----------------------------
