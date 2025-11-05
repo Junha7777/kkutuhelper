@@ -22,5 +22,5 @@ kkutuhelper/overlay 폴더를 터미널에서 연 후
 [kkutu.co.kr](kkutu.co.kr)에 접속 후 아무 방에나 작동하는지 확인
 
 # 단어장
-kkutuhelper/overlay/words.txt에 기본적으로 장문이 저장되어있으며, 아래에 줄바꿈 기준으로 추가하실 수 있습니다.
-~~kkutuhelper/overlay/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장됩니다.~~ 개선 예정
+kkutuhelper/overlay/words.txt에 기본적으로 한국어 끝말잇기 + 어인정용 장문이 저장되어있으며, 아래에 줄바꿈 기준으로 추가하실 수 있습니다. 
+kkutuhelper/overlay/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장됩니다. // TODO: 개선 필요
