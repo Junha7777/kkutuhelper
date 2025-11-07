@@ -34,3 +34,7 @@ kkutuhelper/overlay 폴더를 터미널에서 연 후
 kkutuhelper/overlay/words.txt에 기본적으로 한국어 끝말잇기 + 어인정용 장문이 저장되어있으며, 아래에 줄바꿈 기준으로 추가하실 수 있습니다.
 
 kkutuhelper/overlay/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장됩니다. // TODO: 개선 필요
+
+# TODO
+미션 기반 단어 추천
+끄3, 핑끄 등 다른 프리서버 지원하기
