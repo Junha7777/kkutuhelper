@@ -37,4 +37,5 @@ kkutuhelper/overlay/kkutudeadlocked.txt에 막힌 글자가 자동으로 저장�
 
 # TODO
 미션 기반 단어 추천
+
 끄3, 핑끄 등 다른 프리서버 지원하기
