@@ -8,6 +8,8 @@ __**정지 먹어도 내 책임 아님**__
 [Korean Notion Docs](https://www.notion.so/Project-Report-KKUTU-HELPER-2216a3ed2d7980dbbdd2fbc6264c9e7f?source=copy_link)
 
 
+<img width="278" height="348" alt="Image" src="https://github.com/user-attachments/assets/6ac42eb2-36d8-48df-819e-2bfa7f11fb2b" />
+
 # 사용법
 ## Chrome
 [chrome://extensions/](chrome://extensions) 에서 개발자모드 활성화 -> 압축 해제된 확장프로그램 로드 클릭
